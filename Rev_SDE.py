@@ -13,17 +13,18 @@ class REVERSE_SDE:
         self.obs_sigma = np.copy(sigma)                 ### the std of observations
         self.y_dim = y_dim                              ### y_dim = nobs
         self.scalefact = scalefact                      ### scalefact is a constant in pyhscis.
+        self.indx_indxob_linear = indx_indxob_linear
+        self.initial_std = initial_std                  ### the initial sample std.
 
-        ### if indx_obs_linear is None, it means the observation is fully linear or nonlinear
-        ### if indx_obs_linear is not None, it means the observation is mixed with linear and nonlinear
+
+        ### if indx_obs_linear is None, it means the observation is fully nonlinear
         ### For example, the model state x = (x_0,x_1,x_2,x_3,x_4,x_5), totally 6 dimensions.
         ### Sparese observation y = (y_0,y_3,y_4,y_5), only the corresponding 4 elements are observable.
-        ### Hence, indx_observable = indxob = [0,3,4,5], indx_unobservable = [1,2]
+        ### Hence, indxob = [0,3,4,5], indx_unob = [1,2]
         ### Additionally, we assign linear operator to "y_0","y_4" and nonlinear operator to "y_3","y_5"
-        ### indx_indxob_linear = [0,2], indx_observable_linear = indxob[[0,2]]=[0,4]
-        ### indx_indxob_nonlinear = [1,3], indx_observable_nonlinear = indxob[[1,3]] = [3,5]
-        self.indx_indxob_linear = indx_indxob_linear
-        self.initial_std = initial_std
+        ### indx_indxob_linear = [0,2], indxob[[0,2]]=[0,4]
+        ### indx_indxob_nonlinear = [1,3], indxob[[1,3]] = [3,5]
+
 
 
 
