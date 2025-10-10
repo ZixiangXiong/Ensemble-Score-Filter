@@ -69,18 +69,12 @@ class REVERSE_SDE:
         ## Normalization for x0
         mean_X0 = np.mean(self.x0[:,self.indxob], axis=0)                            ### (y_dim,)
         std_X0 = np.std(self.x0[:,self.indxob], axis=0)                              ### (y_dim,)
-        print("mean_X0", mean_X0)
-        print("std_X0",std_X0)
         self.x0[:,self.indxob] = (self.x0[:,self.indxob] - mean_X0) / std_X0         ### (ensemble, y_dim)
         ## Normalization for obs and obs_sigma
-        print("self.obs",self.obs)
-        print("self.obs_sigma",self.obs_sigma)
         self.obs[indx_indxob_linear] = (self.obs[indx_indxob_linear] - self.scalefact * mean_X0[indx_indxob_linear]) / std_X0[indx_indxob_linear]
         self.obs[indx_indxob_nonlinear] = np.arctan(((np.tan(self.obs[indx_indxob_nonlinear]) - mean_X0[indx_indxob_nonlinear]) / std_X0[indx_indxob_nonlinear]))
-        print("self.obs[indx_indxob_nonlinear]",self.obs[indx_indxob_nonlinear])
         self.obs_sigma[indx_indxob_linear] = (self.obs_sigma[[self.indx_indxob_linear]] / std_X0[indx_indxob_linear])
         self.obs_sigma[indx_indxob_nonlinear] = np.where(abs(self.obs[indx_indxob_nonlinear]) < 1.55,(self.obs_sigma[indx_indxob_nonlinear] * 1.),self.obs_sigma[indx_indxob_nonlinear] * 1e6)
-        print("self.obs_sigma[indx_indxob_nonlinear]", self.obs_sigma[indx_indxob_nonlinear])
         return mean_X0, std_X0
 
     def reverse_SDE(self):
@@ -108,13 +102,6 @@ class REVERSE_SDE:
             drift_fun = self.f
             # Update
             xt_temp = xt - dt * (drift_fun(t) * xt + diffuse ** 2 * ((xt - alpha_t * self.x0[:,self.indxob]) / sigma2_t) -  self.score_likelihood(xt, t, indx_indxob_linear,  indx_indxob_nonlinear)) + np.sqrt(dt) * diffuse * torch.randn_like(xt)
-            """
-            print("i", i)
-            print("xt_temp", mean_X0 + np.array(xt_temp.mean(axis=0)) * std_X0)
-            print("prior_score", ((xt - alpha_t * self.x0[:, self.indxob]) / sigma2_t).mean(axis=0))
-            print("score_likelihood",self.score_likelihood(xt, t, indx_indxob_linear, indx_indxob_nonlinear).mean(axis=0))
-            print("\n")
-            """
             if (abs(xt_temp.mean(dim=0) - xt_array.mean(axis=0))).all() < tolerance and i > 0.2 * self.p_time_step:
                 xt = xt_temp
                 print("Pseudo time stops at ", i)
@@ -133,12 +120,14 @@ class REVERSE_SDE:
         x_ens_full[:, self.indxob] = x_ens
         x_ens_analysis_new = x_ens_full
 
-        """## Inflation: we want to restore "std(x_ens)" to the initial std "self.initial_std" in order to discentralize the ensembles.
+        """
+        ## Inflation: we want to restore "std(x_ens)" to the initial std "self.initial_std" in order to discentralize the ensembles.
         ## Here we change the std(x_ens) without changing the mean(x_ens).
         mean_infla = np.mean(x_ens_full, axis=0)
         std_infla = np.std(x_ens_full, axis=0)
         Xens_infla = (x_ens_full - mean_infla) / std_infla
-        x_ens_analysis_new = Xens_infla * self.initial_std + mean_infla"""
+        x_ens_analysis_new = Xens_infla * self.initial_std + mean_infla
+        """
 
 
 
