@@ -63,13 +63,6 @@ class REVERSE_SDE2:
         score_x[:, indx_indxob_linear] = -(xt[:, indx_indxob_linear] - \
                                             self.obs[indx_indxob_linear]) / (self.obs_sigma[indx_indxob_linear] ** 2)
         score_x[:, indx_indxob_nonlinear] = (-(np.arctan(xt[:, indx_indxob_nonlinear]) - self.obs[indx_indxob_nonlinear]) / self.obs_sigma[indx_indxob_nonlinear] ** 2) * (1. / (1. + xt[:, indx_indxob_nonlinear])**2)
-        """
-        print("-(np.arctan(xt[:, indx_indxob_nonlinear]) - self.obs[indx_indxob_nonlinear])",-(np.arctan(xt[:, indx_indxob_nonlinear]) - self.obs[indx_indxob_nonlinear]).mean(axis=0))
-        print("self.obs_sigma[indx_indxob_nonlinear] ** 2",self.obs_sigma[indx_indxob_nonlinear] ** 2)
-        print("(1. / (1. + xt[:, indx_indxob_nonlinear])**2)",(1. / (1. + xt[:, indx_indxob_nonlinear])**2))
-        print("score_likelihood",self.g_tau(t) * score_x.mean(axis=0))
-        print("\n")
-        """
         tau = self.g_tau(t)
         return tau * score_x
 
@@ -84,11 +77,9 @@ class REVERSE_SDE2:
         dt = 1.0 / self.p_time_step
         #xt = torch.randn(self.ensemble_size, self.x_dim, device='cuda')
         torch.manual_seed(42)
-        #print("self.y_dim",self.y_dim)
         xt = torch.randn(self.ensemble_size, self.y_dim)
         x_ens_full = np.zeros((self.ensemble_size, self.x_dim))
         x_ens_full[:, indxunob] = self.prior_ensemble[:, indxunob]
-        print("x_ens_full",x_ens_full.mean(axis=0),x_ens_full.shape)
         xt_array = np.zeros((int(self.p_time_step * 0.1), self.y_dim))
         t = 1.0
         for i in range(self.p_time_step):
@@ -101,13 +92,6 @@ class REVERSE_SDE2:
             xt_temp = xt - dt * (drift_fun(t) * xt + diffuse ** 2 * (xt - alpha_t * self.x0[:,self.indxob]) / sigma2_t - \
                        self.score_likelihood(xt, t, indx_indxob_linear,  indx_indxob_nonlinear)) + \
                       np.sqrt(dt) * diffuse * torch.randn_like(xt)
-            """
-            print("i",i)
-            print("xt_temp",xt_temp.mean(axis=0))
-            print("prior_score",((xt - alpha_t * self.x0[:,self.indxob]) / sigma2_t).mean(axis=0))
-            #print("score_likelihood",self.score_likelihood(xt, t, indx_indxob_linear,  indx_indxob_nonlinear).mean(axis=0))
-            print("\n")
-            """
             xt = xt_temp
             t = t - dt
 
