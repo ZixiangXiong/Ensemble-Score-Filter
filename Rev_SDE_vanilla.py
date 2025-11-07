@@ -4,18 +4,17 @@ import torch
 
 
 class REVERSE_SDE2:
-    def __init__(self, pseudo_time_step, prior_ensemble, ensemble_size, obs, sigma, y_dim, scalefact, indxob, indx_indxob_linear):
+    def __init__(self, pseudo_time_step, prior_ensemble, ensemble_size, obs, sigma, y_dim, indxob, indx_indxob_linear):
         self.p_time_step = pseudo_time_step
-        self.x0 = np.copy(prior_ensemble)               ### Must use np.copy(), otherwise it will be changed globally when calling the class
-        self.prior_ensemble = prior_ensemble
+        self.x0 = torch.clone(torch.tensor(prior_ensemble))
+        self.prior_ensemble = torch.clone(torch.tensor(prior_ensemble))
         self.eps_alpha = 0.5
         self.eps_beta = 0.025
         self.ensemble_size = ensemble_size              ### the number of ensembles.
-        self.obs = np.copy(obs)                         ### observations
-        self.obs_sigma = np.copy(sigma)                 ### the std of observations
+        self.obs = torch.clone(torch.tensor(obs))                         ### observations
+        self.obs_sigma = torch.clone(torch.tensor(sigma))                 ### the std of observations
         self.x_dim = prior_ensemble.shape[1]
         self.y_dim = y_dim                              ### y_dim = nobs
-        self.scalefact = scalefact                      ### scalefact is a constant in pyhscis.
         self.indxob = indxob
         self.indx_indxob_linear = indx_indxob_linear
 
@@ -59,10 +58,9 @@ class REVERSE_SDE2:
         # obs: (y_dim,)
         # xt: (ensemble, x_dim)
         # score_x: (ensemble, y_dim)
-        score_x = np.zeros((self.ensemble_size,self.y_dim), np.float32)
-        score_x[:, indx_indxob_linear] = -(xt[:, indx_indxob_linear] - \
-                                            self.obs[indx_indxob_linear]) / (self.obs_sigma[indx_indxob_linear] ** 2)
-        score_x[:, indx_indxob_nonlinear] = (-(np.arctan(xt[:, indx_indxob_nonlinear]) - self.obs[indx_indxob_nonlinear]) / self.obs_sigma[indx_indxob_nonlinear] ** 2) * (1. / (1. + xt[:, indx_indxob_nonlinear])**2)
+        score_x = torch.zeros((self.ensemble_size, self.y_dim),dtype=self.prior_ensemble.dtype)
+        score_x[:, indx_indxob_linear] = -(xt[:, indx_indxob_linear] - self.obs[indx_indxob_linear]) / (self.obs_sigma[indx_indxob_linear] ** 2)
+        score_x[:, indx_indxob_nonlinear] = (-(torch.atan(xt[:, indx_indxob_nonlinear]) - self.obs[indx_indxob_nonlinear]) / self.obs_sigma[indx_indxob_nonlinear] ** 2) * (1. / (1. + xt[:, indx_indxob_nonlinear]**2))
         tau = self.g_tau(t)
         return tau * score_x
 
@@ -70,28 +68,29 @@ class REVERSE_SDE2:
         indxunob = np.sort(np.setdiff1d(np.arange(self.x_dim), self.indxob))
         indx_indxob_linear = self.indx_indxob_linear
         indx_indxob_nonlinear = np.sort(np.setdiff1d(np.arange(self.y_dim), indx_indxob_linear))
-        print("indx_indxob_linear",indx_indxob_linear)
-        print("indx_indxob_nonlinear",indx_indxob_nonlinear)
 
 
         dt = 1.0 / self.p_time_step
-        #xt = torch.randn(self.ensemble_size, self.x_dim, device='cuda')
         torch.manual_seed(42)
+        #xt = torch.randn(self.ensemble_size, self.x_dim, device='cuda')
         xt = torch.randn(self.ensemble_size, self.y_dim)
-        x_ens_full = np.zeros((self.ensemble_size, self.x_dim))
+        xt = (xt - xt.mean(dim=0)) / xt.std(dim=0)
+        x_ens_full = torch.zeros((self.ensemble_size, self.x_dim),dtype=self.prior_ensemble.dtype)
         x_ens_full[:, indxunob] = self.prior_ensemble[:, indxunob]
-        xt_array = np.zeros((int(self.p_time_step * 0.1), self.y_dim))
         t = 1.0
         for i in range(self.p_time_step):
             # prior score evaluation
             alpha_t = self.cond_alpha(t)
             sigma2_t = self.cond_sigma_sq(t)
             diffuse = self.g(t)
-            drift_fun = self.f
+            drift_fun = self.f(t)
+            prior_score = - (xt - alpha_t * self.x0[:,self.indxob]) / sigma2_t
+            damping_likelihood = self.score_likelihood(xt, t, indx_indxob_linear, indx_indxob_nonlinear)
+            posterior_score = prior_score + damping_likelihood
+            posterior_score = torch.clip(posterior_score, min=-1000., max=1000.)
             # Update
-            xt_temp = xt - dt * (drift_fun(t) * xt + diffuse ** 2 * (xt - alpha_t * self.x0[:,self.indxob]) / sigma2_t - \
-                       self.score_likelihood(xt, t, indx_indxob_linear,  indx_indxob_nonlinear)) + \
-                      np.sqrt(dt) * diffuse * torch.randn_like(xt)
+            xt_temp = xt - dt * (drift_fun * xt - diffuse ** 2 * posterior_score) + np.sqrt(dt) * diffuse * torch.randn_like(xt)
+            #xt_temp = xt - dt * (drift_fun * xt - diffuse ** 2 * prior_score - damping_likelihood) + np.sqrt(dt) * diffuse * torch.randn_like(xt)
             xt = xt_temp
             t = t - dt
 
